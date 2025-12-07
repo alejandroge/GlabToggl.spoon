@@ -1,0 +1,277 @@
+[
+  {
+    "Constant" : [
+
+    ],
+    "submodules" : [
+
+    ],
+    "Function" : [
+
+    ],
+    "Variable" : [
+
+    ],
+    "stripped_doc" : [
+
+    ],
+    "Deprecated" : [
+
+    ],
+    "type" : "Module",
+    "desc" : "Track Toggl timers from assigned GitLab issues via a menubar helper.",
+    "Constructor" : [
+
+    ],
+    "doc" : "Track Toggl timers from assigned GitLab issues via a menubar helper.",
+    "Method" : [
+      {
+        "doc" : "Configures the GlabToggl spoon\n\nParameters:\n* o - A table containing configuration parameters.\n * togglApiToken - (string) Your Toggl API token\n * togglWorkspaceId - (string) Your Toggl workspace ID\n * gitlabToken - (string) Your GitLab personal access token\n * gitlabBase - (string) Base URL for GitLab API (default: \"https:\/\/gitlab.com\/api\/v4\")\n * copyUrlOnSelect - (boolean) Copy GitLab issue URL to clipboard after selecting an issue to start a timer for\n   (default: true)\n * issuesCacheTTL - (number) Number of seconds to cache GitLab issues; 0 disables cache expiration (default: 3600)\n\nReturns:\n* The `GlabToggl` spoon object",
+        "stripped_doc" : [
+          "Configures the GlabToggl spoon",
+          ""
+        ],
+        "desc" : "Configures the GlabToggl spoon",
+        "def" : "GlabToggl:configure(o) -> GlabToggl",
+        "notes" : [
+
+        ],
+        "signature" : "GlabToggl:configure(o) -> GlabToggl",
+        "type" : "Method",
+        "returns" : [
+          "* The `GlabToggl` spoon object"
+        ],
+        "name" : "configure",
+        "parameters" : [
+          "* o - A table containing configuration parameters.",
+          " * togglApiToken - (string) Your Toggl API token",
+          " * togglWorkspaceId - (string) Your Toggl workspace ID",
+          " * gitlabToken - (string) Your GitLab personal access token",
+          " * gitlabBase - (string) Base URL for GitLab API (default: \"https:\/\/gitlab.com\/api\/v4\")",
+          " * copyUrlOnSelect - (boolean) Copy GitLab issue URL to clipboard after selecting an issue to start a timer for",
+          "   (default: true)",
+          " * issuesCacheTTL - (number) Number of seconds to cache GitLab issues; 0 disables cache expiration (default: 3600)",
+          ""
+        ]
+      },
+      {
+        "doc" : "Starts the GlabToggl spoon\n\nParameters:\n* None\n\nReturns:\n* The `GlabToggl` spoon object",
+        "stripped_doc" : [
+          "Starts the GlabToggl spoon",
+          ""
+        ],
+        "desc" : "Starts the GlabToggl spoon",
+        "def" : "GlabToggl:start() -> none",
+        "notes" : [
+
+        ],
+        "signature" : "GlabToggl:start() -> none",
+        "type" : "Method",
+        "returns" : [
+          "* The `GlabToggl` spoon object"
+        ],
+        "name" : "start",
+        "parameters" : [
+          "* None",
+          ""
+        ]
+      },
+      {
+        "doc" : "Opens a chooser to select a GitLab issue to start a Toggl timer for\n\nParameters:\n* None\n\nReturns:\n* The `GlabToggl` spoon object",
+        "stripped_doc" : [
+          "Opens a chooser to select a GitLab issue to start a Toggl timer for",
+          ""
+        ],
+        "desc" : "Opens a chooser to select a GitLab issue to start a Toggl timer for",
+        "def" : "GlabToggl:openChooser() -> none",
+        "notes" : [
+
+        ],
+        "signature" : "GlabToggl:openChooser() -> none",
+        "type" : "Method",
+        "returns" : [
+          "* The `GlabToggl` spoon object"
+        ],
+        "name" : "openChooser",
+        "parameters" : [
+          "* None",
+          ""
+        ]
+      },
+      {
+        "doc" : "Stops the currently running Toggl timer\n\nParameters:\n* None\n\nReturns:\n* The `GlabToggl` spoon object",
+        "stripped_doc" : [
+          "Stops the currently running Toggl timer",
+          ""
+        ],
+        "desc" : "Stops the currently running Toggl timer",
+        "def" : "GlabToggl:stopCurrent() -> none",
+        "notes" : [
+
+        ],
+        "signature" : "GlabToggl:stopCurrent() -> none",
+        "type" : "Method",
+        "returns" : [
+          "* The `GlabToggl` spoon object"
+        ],
+        "name" : "stopCurrent",
+        "parameters" : [
+          "* None",
+          ""
+        ]
+      },
+      {
+        "doc" : "Binds hotkeys for GlabToggl commands\n\nParameters:\n* mapping - A table containing hotkey modifier\/key details for the following commands:\n * openChooser - Opens the GitLab issue chooser\n * stopCurrent - Stops the currently running Toggl timer\n\nReturns:\n * The `GlabToggl` spoon object",
+        "stripped_doc" : [
+          "Binds hotkeys for GlabToggl commands",
+          ""
+        ],
+        "desc" : "Binds hotkeys for GlabToggl commands",
+        "def" : "GlabToggl:bindHotkeys(mapping) -> GlabToggl",
+        "notes" : [
+
+        ],
+        "signature" : "GlabToggl:bindHotkeys(mapping) -> GlabToggl",
+        "type" : "Method",
+        "returns" : [
+          " * The `GlabToggl` spoon object"
+        ],
+        "name" : "bindHotkeys",
+        "parameters" : [
+          "* mapping - A table containing hotkey modifier\/key details for the following commands:",
+          " * openChooser - Opens the GitLab issue chooser",
+          " * stopCurrent - Stops the currently running Toggl timer",
+          ""
+        ]
+      }
+    ],
+    "items" : [
+      {
+        "doc" : "Binds hotkeys for GlabToggl commands\n\nParameters:\n* mapping - A table containing hotkey modifier\/key details for the following commands:\n * openChooser - Opens the GitLab issue chooser\n * stopCurrent - Stops the currently running Toggl timer\n\nReturns:\n * The `GlabToggl` spoon object",
+        "stripped_doc" : [
+          "Binds hotkeys for GlabToggl commands",
+          ""
+        ],
+        "desc" : "Binds hotkeys for GlabToggl commands",
+        "def" : "GlabToggl:bindHotkeys(mapping) -> GlabToggl",
+        "notes" : [
+
+        ],
+        "signature" : "GlabToggl:bindHotkeys(mapping) -> GlabToggl",
+        "type" : "Method",
+        "returns" : [
+          " * The `GlabToggl` spoon object"
+        ],
+        "name" : "bindHotkeys",
+        "parameters" : [
+          "* mapping - A table containing hotkey modifier\/key details for the following commands:",
+          " * openChooser - Opens the GitLab issue chooser",
+          " * stopCurrent - Stops the currently running Toggl timer",
+          ""
+        ]
+      },
+      {
+        "doc" : "Configures the GlabToggl spoon\n\nParameters:\n* o - A table containing configuration parameters.\n * togglApiToken - (string) Your Toggl API token\n * togglWorkspaceId - (string) Your Toggl workspace ID\n * gitlabToken - (string) Your GitLab personal access token\n * gitlabBase - (string) Base URL for GitLab API (default: \"https:\/\/gitlab.com\/api\/v4\")\n * copyUrlOnSelect - (boolean) Copy GitLab issue URL to clipboard after selecting an issue to start a timer for\n   (default: true)\n * issuesCacheTTL - (number) Number of seconds to cache GitLab issues; 0 disables cache expiration (default: 3600)\n\nReturns:\n* The `GlabToggl` spoon object",
+        "stripped_doc" : [
+          "Configures the GlabToggl spoon",
+          ""
+        ],
+        "desc" : "Configures the GlabToggl spoon",
+        "def" : "GlabToggl:configure(o) -> GlabToggl",
+        "notes" : [
+
+        ],
+        "signature" : "GlabToggl:configure(o) -> GlabToggl",
+        "type" : "Method",
+        "returns" : [
+          "* The `GlabToggl` spoon object"
+        ],
+        "name" : "configure",
+        "parameters" : [
+          "* o - A table containing configuration parameters.",
+          " * togglApiToken - (string) Your Toggl API token",
+          " * togglWorkspaceId - (string) Your Toggl workspace ID",
+          " * gitlabToken - (string) Your GitLab personal access token",
+          " * gitlabBase - (string) Base URL for GitLab API (default: \"https:\/\/gitlab.com\/api\/v4\")",
+          " * copyUrlOnSelect - (boolean) Copy GitLab issue URL to clipboard after selecting an issue to start a timer for",
+          "   (default: true)",
+          " * issuesCacheTTL - (number) Number of seconds to cache GitLab issues; 0 disables cache expiration (default: 3600)",
+          ""
+        ]
+      },
+      {
+        "doc" : "Opens a chooser to select a GitLab issue to start a Toggl timer for\n\nParameters:\n* None\n\nReturns:\n* The `GlabToggl` spoon object",
+        "stripped_doc" : [
+          "Opens a chooser to select a GitLab issue to start a Toggl timer for",
+          ""
+        ],
+        "desc" : "Opens a chooser to select a GitLab issue to start a Toggl timer for",
+        "def" : "GlabToggl:openChooser() -> none",
+        "notes" : [
+
+        ],
+        "signature" : "GlabToggl:openChooser() -> none",
+        "type" : "Method",
+        "returns" : [
+          "* The `GlabToggl` spoon object"
+        ],
+        "name" : "openChooser",
+        "parameters" : [
+          "* None",
+          ""
+        ]
+      },
+      {
+        "doc" : "Starts the GlabToggl spoon\n\nParameters:\n* None\n\nReturns:\n* The `GlabToggl` spoon object",
+        "stripped_doc" : [
+          "Starts the GlabToggl spoon",
+          ""
+        ],
+        "desc" : "Starts the GlabToggl spoon",
+        "def" : "GlabToggl:start() -> none",
+        "notes" : [
+
+        ],
+        "signature" : "GlabToggl:start() -> none",
+        "type" : "Method",
+        "returns" : [
+          "* The `GlabToggl` spoon object"
+        ],
+        "name" : "start",
+        "parameters" : [
+          "* None",
+          ""
+        ]
+      },
+      {
+        "doc" : "Stops the currently running Toggl timer\n\nParameters:\n* None\n\nReturns:\n* The `GlabToggl` spoon object",
+        "stripped_doc" : [
+          "Stops the currently running Toggl timer",
+          ""
+        ],
+        "desc" : "Stops the currently running Toggl timer",
+        "def" : "GlabToggl:stopCurrent() -> none",
+        "notes" : [
+
+        ],
+        "signature" : "GlabToggl:stopCurrent() -> none",
+        "type" : "Method",
+        "returns" : [
+          "* The `GlabToggl` spoon object"
+        ],
+        "name" : "stopCurrent",
+        "parameters" : [
+          "* None",
+          ""
+        ]
+      }
+    ],
+    "Command" : [
+
+    ],
+    "Field" : [
+
+    ],
+    "name" : "GlabToggl"
+  }
+]
