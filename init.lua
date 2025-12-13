@@ -21,65 +21,14 @@ obj.config = {
     -- copy gitlab URL to clipboard, after selecting an issue to start a timer for
     copyUrlOnSelect   = true,
     -- seconds; 0 disables cache expiration
-    issuesCacheTTL    = 3600,
+    issuesCacheTTL    = 10,
 }
 
-----------------------------------------------------------------
--- Internals
-----------------------------------------------------------------
 local logger = hs.logger.new("GlabToggl", "info")
 
-obj._menubarItem = nil
-obj._currentTimerDescription = nil
-obj._runningGitlabIssue = nil
-
-function obj:_ensureStatusItem()
-    if not self._menubarItem then
-        self._menubarItem = hs.menubar.new()
-    end
-    return self._menubarItem
-end
-
-function obj:_setMenubarItemStatus(runningGitlabIssue)
-    local item = self:_ensureStatusItem()
-    if not item then return end
-
-    if not runningGitlabIssue then
-        item:setTitle("GlabToggl: idle")
-        item:setTooltip("No timer running")
-    else
-        local desc = string.format("%s #%s", runningGitlabIssue.text, tostring(runningGitlabIssue.iid or ""))
-
-        item:setTitle("GlabToggl: tracking")
-        item:setTooltip("Tracking: " .. runningGitlabIssue.text)
-    end
-end
-
-function obj:_setMenubarItemIssuesList(gitlabIssues)
-    local item = self:_ensureStatusItem()
-    if not item then return end
-
-    if gitlabIssues and #gitlabIssues > 0 then
-        local menuItems = {}
-        for _, issue in ipairs(gitlabIssues) do
-            table.insert(menuItems, {
-                title = issue.text .. " #" .. tostring(issue.iid or ""),
-                disabled = true,
-            })
-        end
-        item:setMenu(menuItems)
-    else
-        item:setMenu({
-            { title = "No assigned GitLab issues", disabled = true },
-        })
-    end
-end
-
-function obj:_setRunningDescription(desc)
-    self._currentTimerDescription = desc
-    self:_setMenubarItemStatus(desc)
-end
-
+----------------------------------------------------------------
+-- Third-party calls
+----------------------------------------------------------------
 local function iso_now_utc()
     return os.date("!%Y-%m-%dT%H:%M:%S.000Z")
 end
@@ -305,6 +254,79 @@ local function getGitlabIssues(cfg, onSuccess)
     end
 end
 
+----------------------------------------------------------------
+-- Internals
+----------------------------------------------------------------
+obj._menubarItem = nil
+obj._currentTimerDescription = nil
+obj._runningGitlabIssue = nil
+
+function obj:_ensureStatusItem()
+    if not self._menubarItem then
+        self._menubarItem = hs.menubar.new()
+    end
+    return self._menubarItem
+end
+
+function obj:_setMenubarItemStatus(runningGitlabIssue)
+    local item = self:_ensureStatusItem()
+    if not item then return end
+
+    if not runningGitlabIssue then
+        item:setTitle("GlabToggl: idle")
+        item:setTooltip("No timer running")
+    else
+        local desc = string.format("%s #%s", runningGitlabIssue.text, tostring(runningGitlabIssue.iid or ""))
+
+        item:setTitle("GlabToggl: tracking")
+        item:setTooltip("Tracking: " .. runningGitlabIssue.text)
+    end
+end
+
+function obj:_trackGitlabIssue(issue)
+    if not issue or issue._status then return end
+    local desc = string.format("%s #%s", issue.text, tostring(issue.iid or ""))
+
+    local cfg = self.config
+
+    startTogglTimer(self, cfg, desc, function(success)
+        obj._runningGitlabIssue = issue
+
+        if success then
+            if cfg.copyUrlOnSelect and issue.url then
+                hs.pasteboard.setContents(issue.url)
+            end
+
+            self:_setMenubarItemStatus(issue)
+        end
+    end)
+end
+
+function obj:_setMenubarItemIssuesList(gitlabIssues)
+    local item = self:_ensureStatusItem()
+    if not item then return end
+
+    if gitlabIssues and #gitlabIssues > 0 then
+        local menuItems = {}
+        for _, issue in ipairs(gitlabIssues) do
+            table.insert(menuItems, {
+                title = issue.text .. " #" .. tostring(issue.iid or ""),
+                fn = function() self:_trackGitlabIssue(issue) end,
+            })
+        end
+        item:setMenu(menuItems)
+    else
+        item:setMenu({
+            { title = "No assigned GitLab issues", disabled = true },
+        })
+    end
+end
+
+function obj:_setRunningDescription(desc)
+    self._currentTimerDescription = desc
+    self:_setMenubarItemStatus(desc)
+end
+
 local function getConfigErrors(cfg)
     local errors = {}
 
@@ -377,6 +399,15 @@ function obj:start()
 
     self._runningGitlabIssue = nil
     self:_setMenubarItemStatus(nil)
+    self._menubarItem:setClickCallback(function()
+        local cfg = self.config
+
+        local gitlabIssues = {}
+        getGitlabIssues(cfg, function(gitlabIssues)
+            self:_setMenubarItemIssuesList(gitlabIssues)
+            return self
+        end)
+    end)
 
     return self
 end
@@ -400,20 +431,7 @@ function obj:openChooser()
         end
 
         local c = hs.chooser.new(function(selectedGitlabIssue)
-            if not selectedGitlabIssue or selectedGitlabIssue._status then return end
-            local desc = string.format("%s #%s", selectedGitlabIssue.text, tostring(selectedGitlabIssue.iid or ""))
-
-            startTogglTimer(self, cfg, desc, function(success)
-                obj._runningGitlabIssue = selectedGitlabIssue
-
-                if success then
-                    if cfg.copyUrlOnSelect and selectedGitlabIssue.url then
-                        hs.pasteboard.setContents(selectedGitlabIssue.url)
-                    end
-
-                    self:_setMenubarItemStatus(selectedGitlabIssue)
-                end
-            end)
+            obj:_trackGitlabIssue(selectedGitlabIssue)
         end)
 
         self:_setMenubarItemIssuesList(gitlabIssues)
