@@ -22,6 +22,12 @@ obj.config = {
     copyUrlOnSelect   = true,
     -- seconds; 0 disables cache expiration
     issuesCacheTTL    = 10,
+    idleReminderEnabled = true,
+    idleReminderInterval = 300,
+    idleReminderStartTime = "09:30",
+    idleReminderEndTime = "18:00",
+    idleReminderWeekdaysOnly = true,
+    idleReminderAlertDuration = 8,
 }
 
 local logger = hs.logger.new("GlabToggl", "info")
@@ -71,9 +77,8 @@ local function startTogglTimer(self, cfg, desc, callback)
     end)
 end
 
-local function stopTogglTimer(self, cfg, callback)
+local function getCurrentTogglTimer(cfg, callback)
     local auth = togglAuthHeader(cfg)
-
     local currentTimeEntryUrl = "https://api.track.toggl.com/api/v9/me/time_entries/current"
     local headers = {
         ["Authorization"] = auth,
@@ -82,14 +87,36 @@ local function stopTogglTimer(self, cfg, callback)
 
     hs.http.doAsyncRequest(currentTimeEntryUrl, "GET", nil, headers, function(status, resp, _)
         if status < 200 or status >= 300 then
+            callback(false, nil, status, resp)
+            return
+        end
+
+        local running = hs.json.decode(resp) or nil
+        if not running or running.duration >= 0 then
+            callback(true, nil, status, resp)
+            return
+        end
+
+        callback(true, running, status, resp)
+    end)
+end
+
+local function stopTogglTimer(self, cfg, callback)
+    local auth = togglAuthHeader(cfg)
+    local headers = {
+        ["Authorization"] = auth,
+        ["Content-Type"] = "application/json",
+    }
+
+    getCurrentTogglTimer(cfg, function(success, running, status, resp)
+        if not success then
             hs.alert.show("Toggl list error " .. status)
             logger.e("Failed to get current time entry: " .. tostring(resp))
             callback(false)
             return
         end
 
-        local running = hs.json.decode(resp) or nil
-        if not running or running.duration >= 0 then
+        if not running then
             callback(true)
             return
         end
@@ -228,6 +255,39 @@ local function getCachedIssuesRaw(cfg)
     return entry.raw, not isFresh
 end
 
+local function parseTimeOfDay(value)
+    if type(value) ~= "string" then return nil end
+
+    local hour, minute = value:match("^(%d%d?):(%d%d)$")
+    hour = tonumber(hour)
+    minute = tonumber(minute)
+
+    if not hour or not minute then return nil end
+    if hour < 0 or hour > 23 then return nil end
+    if minute < 0 or minute > 59 then return nil end
+
+    return hour * 60 + minute
+end
+
+local function isWithinIdleReminderWindow(cfg)
+    local now = os.date("*t")
+
+    if cfg.idleReminderWeekdaysOnly and (now.wday == 1 or now.wday == 7) then
+        return false
+    end
+
+    local startMinutes = parseTimeOfDay(cfg.idleReminderStartTime)
+    local endMinutes = parseTimeOfDay(cfg.idleReminderEndTime)
+
+    if not startMinutes or not endMinutes then
+        logger.e("Invalid idle reminder time window")
+        return false
+    end
+
+    local currentMinutes = now.hour * 60 + now.min
+    return currentMinutes >= startMinutes and currentMinutes < endMinutes
+end
+
 local function getGitlabIssues(cfg, onSuccess)
     local cachedIssues, shouldFetch = getCachedIssuesRaw(cfg)
 
@@ -260,6 +320,8 @@ end
 obj._menubarItem = nil
 obj._currentTimerDescription = nil
 obj._runningGitlabIssue = nil
+obj._idleReminderTimer = nil
+obj._idleReminderNotification = nil
 
 function obj:_ensureStatusItem()
     if not self._menubarItem then
@@ -327,6 +389,56 @@ function obj:_setRunningDescription(desc)
     self:_setMenubarItemStatus(desc)
 end
 
+function obj:_showIdleReminder()
+    hs.alert.show("No Toggl timer running", self.config.idleReminderAlertDuration)
+
+    self._idleReminderNotification = hs.notify.new(function()
+        self:openChooser()
+    end, {
+        title = "No Toggl timer running",
+        informativeText = "What are you working on?",
+        withdrawAfter = 0,
+    })
+
+    self._idleReminderNotification:send()
+end
+
+function obj:_checkIdleReminder()
+    local cfg = self.config
+
+    if not cfg.idleReminderEnabled then return end
+    if not isWithinIdleReminderWindow(cfg) then return end
+
+    getCurrentTogglTimer(cfg, function(success, running, status, resp)
+        if not success then
+            logger.e("Idle reminder failed to get current time entry: " .. tostring(status) .. " " .. tostring(resp))
+            return
+        end
+
+        if running then return end
+
+        self._runningGitlabIssue = nil
+        self:_setMenubarItemStatus(nil)
+        self:_showIdleReminder()
+    end)
+end
+
+function obj:_startIdleReminderTimer()
+    if self._idleReminderTimer then
+        self._idleReminderTimer:stop()
+        self._idleReminderTimer = nil
+    end
+
+    local cfg = self.config
+    if not cfg.idleReminderEnabled then return end
+    if not cfg.idleReminderInterval or cfg.idleReminderInterval <= 0 then return end
+
+    self._idleReminderTimer = hs.timer.new(cfg.idleReminderInterval, function()
+        self:_checkIdleReminder()
+    end)
+    self._idleReminderTimer:start()
+end
+
 local function getConfigErrors(cfg)
     local errors = {}
 
@@ -361,6 +473,12 @@ end
 ---  * copyUrlOnSelect - (boolean) Copy GitLab issue URL to clipboard after selecting an issue to start a timer for
 ---    (default: true)
 ---  * issuesCacheTTL - (number) Number of seconds to cache GitLab issues; 0 disables cache expiration (default: 3600)
+---  * idleReminderEnabled - (boolean) Check whether a Toggl timer is running during work hours (default: true)
+---  * idleReminderInterval - (number) Seconds between idle reminder checks (default: 300)
+---  * idleReminderStartTime - (string) Local start time for reminders in HH:MM format (default: "09:30")
+---  * idleReminderEndTime - (string) Local end time for reminders in HH:MM format (default: "18:00")
+---  * idleReminderWeekdaysOnly - (boolean) Only remind Monday-Friday using system timezone (default: true)
+---  * idleReminderAlertDuration - (number) Seconds to keep the on-screen alert visible (default: 8)
 ---
 --- Returns:
 --- * The `GlabToggl` spoon object
@@ -408,6 +526,7 @@ function obj:start()
             return self
         end)
     end)
+    self:_startIdleReminderTimer()
 
     return self
 end
