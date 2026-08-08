@@ -4,9 +4,9 @@ Track Toggl timers straight from the GitLab issues assigned to you. GlabToggl ad
 
 ## What it does
 - Pulls your open GitLab issues (assigned to you) and caches them for quick access.
-- Opens an issue chooser so you can start a Toggl timer named `"<issue title> #<iid>"`.
+- Opens a task chooser so you can start a Toggl timer from a GitLab issue, configured text task, or typed text.
 - Optionally copies the selected issue URL to your clipboard when you start tracking.
-- Shows menubar status: idle vs. tracking a specific issue; menu lists the cached issues.
+- Shows menubar status: idle vs. tracking; menu separates text tasks from cached GitLab issues.
 - Provides a hotkey to stop the currently running Toggl timer.
 
 ## Requirements
@@ -32,6 +32,7 @@ spoon.GlabToggl:configure({
   gitlabToken       = secrets.gitlabToken,
   -- gitlabBase      = "https://gitlab.com/api/v4", -- override for self-hosted
   -- copyUrlOnSelect = true,
+  -- textTasks       = { "Meetings", "Support Engineer" },
   -- issuesCacheTTL  = 3600, -- seconds; 0 disables cache expiry
 })
 :bindHotkeys({
@@ -42,9 +43,10 @@ spoon.GlabToggl:configure({
 ```
 
 ## Usage
-- `openChooser` hotkey: shows your assigned GitLab issues; picking one starts a Toggl timer and (optionally) copies the issue URL.
+- `openChooser` hotkey: shows configured text tasks and assigned GitLab issues, with the second line indicating the source; picking one starts a Toggl timer and optionally copies the issue URL for GitLab issues.
+- If you type text that does not match an existing option, the chooser offers to start a timer with that exact text.
 - `stopCurrent` hotkey: stops the currently running Toggl timer.
-- Menubar shows `GlabToggl: tracking` while a timer is running and lists cached issues in the dropdown.
+- Menubar shows `GlabToggl: tracking` while a timer is running and separates text tasks from cached GitLab issues in the dropdown.
 
 ## Configuration
 All options are passed to `GlabToggl:configure({...})`:
@@ -56,4 +58,5 @@ All options are passed to `GlabToggl:configure({...})`:
 | `gitlabToken` | GitLab personal access token | required |
 | `gitlabBase` | GitLab API base URL (use your self-hosted URL if needed) | `https://gitlab.com/api/v4` |
 | `copyUrlOnSelect` | Copy issue URL to clipboard after starting a timer | `true` |
+| `textTasks` | Text-only Toggl tasks shown separately from GitLab issues | `{}` |
 | `issuesCacheTTL` | Seconds to cache assigned issues (set `0` to always fetch fresh) | `3600` |

@@ -20,6 +20,7 @@ obj.config = {
     gitlabBase        = "https://gitlab.com/api/v4",
     -- copy gitlab URL to clipboard, after selecting an issue to start a timer for
     copyUrlOnSelect   = true,
+    textTasks         = {},
     -- seconds; 0 disables cache expiration
     issuesCacheTTL    = 10,
     idleReminderEnabled = true,
@@ -31,6 +32,17 @@ obj.config = {
 }
 
 local logger = hs.logger.new("GlabToggl", "info")
+
+local function trim(value)
+    if type(value) ~= "string" then return "" end
+    return value:match("^%s*(.-)%s*$") or ""
+end
+
+local function containsIgnoreCase(value, query)
+    value = string.lower(value or "")
+    query = string.lower(query or "")
+    return value:find(query, 1, true) ~= nil
+end
 
 ----------------------------------------------------------------
 -- Third-party calls
@@ -165,7 +177,10 @@ local function parseIssues(raw)
         if type(it.labels) == "table" and #it.labels > 0 then
             labels = table.concat(it.labels, ", ")
         end
-        local sub = string.format("#%s · %s", tostring(iid or "?"), labels)
+        local sub = string.format("GitLab issue · #%s", tostring(iid or "?"))
+        if labels ~= "" then
+            sub = sub .. " · " .. labels
+        end
         table.insert(choices, {
             text        = title,
             subText     = sub,
@@ -174,6 +189,79 @@ local function parseIssues(raw)
             iid         = iid,
         })
     end
+    return choices
+end
+
+local function textTaskChoice(description, subText)
+    return {
+        text = description,
+        subText = subText or "Text task",
+        description = description,
+        _textTask = true,
+    }
+end
+
+local function statusChoice(text, sub)
+    return { text = text, subText = sub or "", _status = true }
+end
+
+local function getTextTaskChoices(cfg)
+    local choices = {}
+
+    for _, task in ipairs(cfg.textTasks or {}) do
+        local description = nil
+        local subText = "Text task"
+
+        if type(task) == "string" then
+            description = trim(task)
+        elseif type(task) == "table" then
+            description = trim(task.text or task.description or task.title)
+            subText = task.subText or task.subtitle or subText
+        end
+
+        if description ~= "" then
+            table.insert(choices, textTaskChoice(description, subText))
+        end
+    end
+
+    return choices
+end
+
+local function appendChoices(target, choices)
+    for _, choice in ipairs(choices or {}) do
+        table.insert(target, choice)
+    end
+end
+
+local function hasMatchingChoice(choices, query)
+    query = trim(query)
+    if query == "" then return true end
+
+    for _, choice in ipairs(choices or {}) do
+        if not choice._status and containsIgnoreCase(choice.text, query) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function chooserChoices(cfg, gitlabIssues, query)
+    local choices = {}
+    local textTasks = getTextTaskChoices(cfg)
+    query = trim(query)
+
+    if query ~= "" and not hasMatchingChoice(textTasks, query) and not hasMatchingChoice(gitlabIssues, query) then
+        table.insert(choices, textTaskChoice(query, "Typed text task"))
+    end
+
+    appendChoices(choices, textTasks)
+    appendChoices(choices, gitlabIssues)
+
+    if #choices == 0 then
+        table.insert(choices, statusChoice("No configured text tasks or assigned GitLab issues"))
+    end
+
     return choices
 end
 
@@ -338,23 +426,34 @@ function obj:_setMenubarItemStatus(runningGitlabIssue)
         item:setTitle("GlabToggl: idle")
         item:setTooltip("No timer running")
     else
-        local desc = string.format("%s #%s", runningGitlabIssue.text, tostring(runningGitlabIssue.iid or ""))
+        local desc = runningGitlabIssue
+        if type(runningGitlabIssue) == "table" then
+            desc = runningGitlabIssue.text or runningGitlabIssue.description or "Toggl timer"
+            if runningGitlabIssue.iid then
+                desc = string.format("%s #%s", desc, tostring(runningGitlabIssue.iid))
+            end
+        end
 
         item:setTitle("GlabToggl: tracking")
-        item:setTooltip("Tracking: " .. runningGitlabIssue.text)
+        item:setTooltip("Tracking: " .. tostring(desc))
     end
 end
 
 function obj:_trackGitlabIssue(issue)
     if not issue or issue._status then return end
+    if issue._textTask then
+        self:_trackDescription(issue.description or issue.text)
+        return
+    end
+
     local desc = string.format("%s #%s", issue.text, tostring(issue.iid or ""))
 
     local cfg = self.config
 
     startTogglTimer(self, cfg, desc, function(success)
-        obj._runningGitlabIssue = issue
-
         if success then
+            obj._runningGitlabIssue = issue
+
             if cfg.copyUrlOnSelect and issue.url then
                 hs.pasteboard.setContents(issue.url)
             end
@@ -364,22 +463,54 @@ function obj:_trackGitlabIssue(issue)
     end)
 end
 
+function obj:_trackDescription(desc)
+    desc = trim(desc)
+    if desc == "" then return end
+
+    local cfg = self.config
+
+    startTogglTimer(self, cfg, desc, function(success)
+        if success then
+            self._runningGitlabIssue = nil
+            self:_setRunningDescription(desc)
+        end
+    end)
+end
+
 function obj:_setMenubarItemIssuesList(gitlabIssues)
     local item = self:_ensureStatusItem()
     if not item then return end
 
-    if gitlabIssues and #gitlabIssues > 0 then
+    local textTasks = getTextTaskChoices(self.config)
+
+    if #textTasks > 0 or (gitlabIssues and #gitlabIssues > 0) then
         local menuItems = {}
-        for _, issue in ipairs(gitlabIssues) do
+
+        if #textTasks > 0 then
+            table.insert(menuItems, { title = "Text Tasks", disabled = true })
+        end
+        for _, issue in ipairs(textTasks) do
+            table.insert(menuItems, {
+                title = issue.text,
+                fn = function() self:_trackGitlabIssue(issue) end,
+            })
+        end
+
+        if gitlabIssues and #gitlabIssues > 0 then
+            if #menuItems > 0 then table.insert(menuItems, { title = "-" }) end
+            table.insert(menuItems, { title = "GitLab Issues", disabled = true })
+        end
+        for _, issue in ipairs(gitlabIssues or {}) do
             table.insert(menuItems, {
                 title = issue.text .. " #" .. tostring(issue.iid or ""),
                 fn = function() self:_trackGitlabIssue(issue) end,
             })
         end
+
         item:setMenu(menuItems)
     else
         item:setMenu({
-            { title = "No assigned GitLab issues", disabled = true },
+            { title = "No configured text tasks or assigned GitLab issues", disabled = true },
         })
     end
 end
@@ -415,9 +546,14 @@ function obj:_checkIdleReminder()
             return
         end
 
-        if running then return end
+        if running then
+            self._runningGitlabIssue = nil
+            self:_setRunningDescription(running.description or "Toggl timer")
+            return
+        end
 
         self._runningGitlabIssue = nil
+        self._currentTimerDescription = nil
         self:_setMenubarItemStatus(nil)
         self:_showIdleReminder()
     end)
@@ -472,6 +608,8 @@ end
 ---  * gitlabBase - (string) Base URL for GitLab API (default: "https://gitlab.com/api/v4")
 ---  * copyUrlOnSelect - (boolean) Copy GitLab issue URL to clipboard after selecting an issue to start a timer for
 ---    (default: true)
+---  * textTasks - (table) Text-only Toggl tasks to show separately from GitLab issues, e.g. {"Meetings", "Support Engineer"}
+---    (default: {})
 ---  * issuesCacheTTL - (number) Number of seconds to cache GitLab issues; 0 disables cache expiration (default: 3600)
 ---  * idleReminderEnabled - (boolean) Check whether a Toggl timer is running during work hours (default: true)
 ---  * idleReminderInterval - (number) Seconds between idle reminder checks (default: 300)
@@ -533,7 +671,7 @@ end
 
 --- GlabToggl:openChooser() -> none
 --- Method
---- Opens a chooser to select a GitLab issue to start a Toggl timer for
+--- Opens a chooser to select a GitLab issue, configured text task, or typed text to start a Toggl timer for
 ---
 --- Parameters:
 --- * None
@@ -545,22 +683,17 @@ function obj:openChooser()
 
     local gitlabIssues = {}
     getGitlabIssues(cfg, function(gitlabIssues)
-        local function statusChoice(text, sub)
-            return { text = text, subText = sub or "", _status = true }
-        end
-
-        local c = hs.chooser.new(function(selectedGitlabIssue)
-            obj:_trackGitlabIssue(selectedGitlabIssue)
+        local c = hs.chooser.new(function(selectedTask)
+            obj:_trackGitlabIssue(selectedTask)
         end)
 
         self:_setMenubarItemIssuesList(gitlabIssues)
 
-        c:placeholderText("Select a GitLab issue")
-        if gitlabIssues and #gitlabIssues > 0 then
-            c:choices(gitlabIssues)
-        else
-            c:choices({ statusChoice("No assigned GitLab issues") })
-        end
+        c:placeholderText("Select a task or type a new one")
+        c:choices(chooserChoices(cfg, gitlabIssues, ""))
+        c:queryChangedCallback(function(query)
+            c:choices(chooserChoices(cfg, gitlabIssues, query))
+        end)
 
         c:show()
     end)
