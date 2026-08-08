@@ -33,6 +33,10 @@ obj.config = {
 
 local logger = hs.logger.new("GlabToggl", "info")
 
+local menubarIdleTitle = "GT ○"
+local menubarTrackingTitle = "GT ●"
+local menubarErrorTitle = "GT ⚠"
+
 local function trim(value)
     if type(value) ~= "string" then return "" end
     return value:match("^%s*(.-)%s*$") or ""
@@ -423,7 +427,7 @@ function obj:_setMenubarItemStatus(runningGitlabIssue)
     if not item then return end
 
     if not runningGitlabIssue then
-        item:setTitle("GlabToggl: idle")
+        item:setTitle(menubarIdleTitle)
         item:setTooltip("No timer running")
     else
         local desc = runningGitlabIssue
@@ -434,7 +438,7 @@ function obj:_setMenubarItemStatus(runningGitlabIssue)
             end
         end
 
-        item:setTitle("GlabToggl: tracking")
+        item:setTitle(menubarTrackingTitle)
         item:setTooltip("Tracking: " .. tostring(desc))
     end
 end
@@ -637,8 +641,9 @@ end
 function obj:start()
     local errors = getConfigErrors(self.config)
     if #errors > 0 then
-        self._menubarItem:setTitle("GlabToggl: ⚠")
-        self._menubarItem:setTooltip("Some issues were found in the GlabToggl configuration")
+        local item = self:_ensureStatusItem()
+        item:setTitle(menubarErrorTitle)
+        item:setTooltip("Some issues were found in the GlabToggl configuration")
 
         local menuItems = {}
         for _, err in ipairs(errors) do
@@ -649,7 +654,7 @@ function obj:start()
         table.insert(menuItems, { title = "-" }) -- separator
         table.insert(menuItems, { title = "Please update the configuration", disabled = true })
 
-        self._menubarItem:setMenu(menuItems)
+        item:setMenu(menuItems)
         return
     end
 

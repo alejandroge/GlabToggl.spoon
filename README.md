@@ -46,7 +46,7 @@ spoon.GlabToggl:configure({
 - `openChooser` hotkey: shows configured text tasks and assigned GitLab issues, with the second line indicating the source; picking one starts a Toggl timer and optionally copies the issue URL for GitLab issues.
 - If you type text that does not match an existing option, the chooser offers to start a timer with that exact text.
 - `stopCurrent` hotkey: stops the currently running Toggl timer.
-- Menubar shows `GlabToggl: tracking` while a timer is running and separates text tasks from cached GitLab issues in the dropdown.
+- Menubar shows a short fixed-width status (`GT ○` idle, `GT ●` tracking) and keeps the current task name in the tooltip.
 
 ## Configuration
 All options are passed to `GlabToggl:configure({...})`:
