@@ -237,6 +237,20 @@ local function appendChoices(target, choices)
     end
 end
 
+local function filterChoices(choices, query)
+    query = trim(query)
+    if query == "" then return choices or {} end
+
+    local filtered = {}
+    for _, choice in ipairs(choices or {}) do
+        if not choice._status and containsIgnoreCase(choice.text, query) then
+            table.insert(filtered, choice)
+        end
+    end
+
+    return filtered
+end
+
 local function hasMatchingChoice(choices, query)
     query = trim(query)
     if query == "" then return true end
@@ -253,14 +267,16 @@ end
 local function chooserChoices(cfg, gitlabIssues, query)
     local choices = {}
     local textTasks = getTextTaskChoices(cfg)
+    local filteredTextTasks = filterChoices(textTasks, query)
+    local filteredGitlabIssues = filterChoices(gitlabIssues, query)
     query = trim(query)
 
     if query ~= "" and not hasMatchingChoice(textTasks, query) and not hasMatchingChoice(gitlabIssues, query) then
         table.insert(choices, textTaskChoice(query, "Typed text task"))
     end
 
-    appendChoices(choices, textTasks)
-    appendChoices(choices, gitlabIssues)
+    appendChoices(choices, filteredTextTasks)
+    appendChoices(choices, filteredGitlabIssues)
 
     if #choices == 0 then
         table.insert(choices, statusChoice("No configured text tasks or assigned GitLab issues"))
