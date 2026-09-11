@@ -11,7 +11,7 @@ Track Toggl timers straight from the GitLab issues assigned to you. GlabToggl ad
 
 ## Requirements
 - Hammerspoon (tested with `hs.spoons`).
-- Toggl API token and workspace ID.
+- Toggl 2.0 API key, organization ID, and workspace ID.
 - GitLab personal access token (scope `read_api` is enough for listing issues).
 
 ## Installation
@@ -28,6 +28,7 @@ local secrets = dofile(os.getenv("HOME") .. "/.hammerspoon/secrets.lua")
 spoon.GlabToggl:configure({
   assignee          = "your.gitlab.username",
   togglApiToken     = secrets.togglApiToken,
+  togglOrganizationId = secrets.togglOrganizationId,
   togglWorkspaceId  = secrets.togglWorkspaceId,
   gitlabToken       = secrets.gitlabToken,
   -- gitlabBase      = "https://gitlab.com/api/v4", -- override for self-hosted
@@ -53,7 +54,8 @@ All options are passed to `GlabToggl:configure({...})`:
 
 | Option | Description | Default |
 | --- | --- | --- |
-| `togglApiToken` | Toggl API token | required |
+| `togglApiToken` | Toggl 2.0 API key | required |
+| `togglOrganizationId` | Toggl organization ID | required |
 | `togglWorkspaceId` | Toggl workspace ID | required |
 | `gitlabToken` | GitLab personal access token | required |
 | `gitlabBase` | GitLab API base URL (use your self-hosted URL if needed) | `https://gitlab.com/api/v4` |

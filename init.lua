@@ -15,6 +15,7 @@ obj.license = "MIT - https://opensource.org/licenses/MIT"
 ----------------------------------------------------------------
 obj.config = {
     togglApiToken     = "",
+    togglOrganizationId = "",
     togglWorkspaceId  = "",
     gitlabToken       = "",
     gitlabBase        = "https://gitlab.com/api/v4",
@@ -59,7 +60,12 @@ local function togglAuthHeader(cfg)
     if not cfg.togglApiToken then return nil end
     if cfg.togglApiToken == "" then return nil end
 
-    return "Basic " .. hs.base64.encode(cfg.togglApiToken .. ":api_token")
+    return "Bearer " .. cfg.togglApiToken
+end
+
+local function togglWorkspaceUrl(cfg, path)
+    return ("https://focus.toggl.com/api/organizations/%s/workspaces/%s/%s")
+        :format(cfg.togglOrganizationId, cfg.togglWorkspaceId, path)
 end
 
 local function parseInt(h) return (h and h ~= "" and tonumber(h)) or nil end
@@ -67,15 +73,12 @@ local function parseInt(h) return (h and h ~= "" and tonumber(h)) or nil end
 local function startTogglTimer(self, cfg, desc, callback)
     local auth = togglAuthHeader(cfg)
 
-    local url = ("https://api.track.toggl.com/api/v9/workspaces/%s/time_entries"):format(cfg.togglWorkspaceId)
+    local url = togglWorkspaceUrl(cfg, "tracking/start")
     local bodyTbl = {
-        description   = desc,
-        created_with  = cfg.createdWith,
-        start         = iso_now_utc(),
-        duration      = -1, -- running entry
-        workspace_id  = tonumber(cfg.togglWorkspaceId),
-        billable      = false,
-        created_with  = "hammerspoon (GlabToggl)",
+        description = desc,
+        start       = iso_now_utc(),
+        billable    = false,
+        type        = "activity",
     }
     local headers = {
         ["Content-Type"]  = "application/json",
@@ -95,25 +98,30 @@ end
 
 local function getCurrentTogglTimer(cfg, callback)
     local auth = togglAuthHeader(cfg)
-    local currentTimeEntryUrl = "https://api.track.toggl.com/api/v9/me/time_entries/current"
+    local currentTimeEntryUrl = togglWorkspaceUrl(cfg, "tracking/current")
     local headers = {
         ["Authorization"] = auth,
         ["Content-Type"] = "application/json",
     }
 
     hs.http.doAsyncRequest(currentTimeEntryUrl, "GET", nil, headers, function(status, resp, _)
+        if status == 204 then
+            callback(true, nil, status, resp)
+            return
+        end
+
         if status < 200 or status >= 300 then
             callback(false, nil, status, resp)
             return
         end
 
-        local running = hs.json.decode(resp) or nil
-        if not running or running.duration >= 0 then
+        local current = hs.json.decode(resp) or nil
+        if not current or not current.id then
             callback(true, nil, status, resp)
             return
         end
 
-        callback(true, running, status, resp)
+        callback(true, current, status, resp)
     end)
 end
 
@@ -124,39 +132,29 @@ local function stopTogglTimer(self, cfg, callback)
         ["Content-Type"] = "application/json",
     }
 
-    getCurrentTogglTimer(cfg, function(success, running, status, resp)
-        if not success then
-            hs.alert.show("Toggl list error " .. status)
-            logger.e("Failed to get current time entry: " .. tostring(resp))
-            callback(false)
-            return
-        end
+    local stopUrl = togglWorkspaceUrl(cfg, "tracking/stop")
 
-        if not running then
-            callback(true)
-            return
-        end
-
-        local stopUrl = (
-            "https://api.track.toggl.com/api/v9/workspaces/%s/time_entries/%s/stop"
-        ):format(cfg.togglWorkspaceId, running.id)
-
-        hs.http.doAsyncRequest(
-            stopUrl,
-            "PATCH",
-            "{}",
-            headers,
-            function(st, _, _)
-                if st >= 200 and st < 300 then
-                    callback(true)
-                else
-                    hs.alert.show("Stop failed " .. st)
-                    logger.e("Failed to stop time entry: " .. tostring(st))
-                    callback(false)
-                end
+    hs.http.doAsyncRequest(
+        stopUrl,
+        "POST",
+        hs.json.encode({ ["end"] = iso_now_utc() }, true),
+        headers,
+        function(status, resp, _)
+            if status >= 200 and status < 300 then
+                callback(true)
+                return
             end
-        )
-    end)
+
+            if status == 404 then
+                callback(true)
+                return
+            end
+
+            hs.alert.show("Stop failed " .. status)
+            logger.e("Failed to stop time entry: " .. tostring(status) .. " " .. tostring(resp))
+            callback(false)
+        end
+    )
 end
 
 local function gitlabAuthHeaders(cfg)
@@ -602,6 +600,10 @@ local function getConfigErrors(cfg)
         table.insert(errors, "togglApiToken is required")
     end
 
+    if not cfg.togglOrganizationId or cfg.togglOrganizationId == "" then
+        table.insert(errors, "togglOrganizationId is required")
+    end
+
     if not cfg.togglWorkspaceId or cfg.togglWorkspaceId == "" then
         table.insert(errors, "togglWorkspaceId is required")
     end
@@ -622,7 +624,8 @@ end
 ---
 --- Parameters:
 --- * o - A table containing configuration parameters.
----  * togglApiToken - (string) Your Toggl API token
+---  * togglApiToken - (string) Your Toggl 2.0 API key
+---  * togglOrganizationId - (string) Your Toggl organization ID
 ---  * togglWorkspaceId - (string) Your Toggl workspace ID
 ---  * gitlabToken - (string) Your GitLab personal access token
 ---  * gitlabBase - (string) Base URL for GitLab API (default: "https://gitlab.com/api/v4")
