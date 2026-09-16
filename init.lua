@@ -235,6 +235,20 @@ local function appendChoices(target, choices)
     end
 end
 
+local function runningDescription(running)
+    if not running then return nil end
+
+    if type(running) == "table" then
+        local desc = running.text or running.description or "Toggl timer"
+        if running.iid then
+            desc = string.format("%s #%s", desc, tostring(running.iid))
+        end
+        return desc
+    end
+
+    return tostring(running)
+end
+
 local function filterChoices(choices, query)
     query = trim(query)
     if query == "" then return choices or {} end
@@ -426,6 +440,7 @@ end
 obj._menubarItem = nil
 obj._currentTimerDescription = nil
 obj._runningGitlabIssue = nil
+obj._gitlabIssues = nil
 obj._idleReminderTimer = nil
 obj._idleReminderNotification = nil
 
@@ -441,16 +456,12 @@ function obj:_setMenubarItemStatus(runningGitlabIssue)
     if not item then return end
 
     if not runningGitlabIssue then
+        self._currentTimerDescription = nil
         item:setTitle(menubarIdleTitle)
         item:setTooltip("No timer running")
     else
-        local desc = runningGitlabIssue
-        if type(runningGitlabIssue) == "table" then
-            desc = runningGitlabIssue.text or runningGitlabIssue.description or "Toggl timer"
-            if runningGitlabIssue.iid then
-                desc = string.format("%s #%s", desc, tostring(runningGitlabIssue.iid))
-            end
-        end
+        local desc = runningDescription(runningGitlabIssue)
+        self._currentTimerDescription = desc
 
         item:setTitle(menubarTrackingTitle)
         item:setTooltip("Tracking: " .. tostring(desc))
@@ -477,6 +488,7 @@ function obj:_trackGitlabIssue(issue)
             end
 
             self:_setMenubarItemStatus(issue)
+            self:_setMenubarItemIssuesList(self._gitlabIssues)
         end
     end)
 end
@@ -491,6 +503,7 @@ function obj:_trackDescription(desc)
         if success then
             self._runningGitlabIssue = nil
             self:_setRunningDescription(desc)
+            self:_setMenubarItemIssuesList(self._gitlabIssues)
         end
     end)
 end
@@ -499,10 +512,20 @@ function obj:_setMenubarItemIssuesList(gitlabIssues)
     local item = self:_ensureStatusItem()
     if not item then return end
 
-    local textTasks = getTextTaskChoices(self.config)
+    if gitlabIssues then self._gitlabIssues = gitlabIssues end
+    gitlabIssues = gitlabIssues or self._gitlabIssues or {}
 
-    if #textTasks > 0 or (gitlabIssues and #gitlabIssues > 0) then
+    local textTasks = getTextTaskChoices(self.config)
+    local currentDescription = runningDescription(self._runningGitlabIssue) or self._currentTimerDescription
+
+    if currentDescription or #textTasks > 0 or (gitlabIssues and #gitlabIssues > 0) then
         local menuItems = {}
+
+        if currentDescription then
+            table.insert(menuItems, { title = "Currently Tracking", disabled = true })
+            table.insert(menuItems, { title = currentDescription, disabled = true })
+            table.insert(menuItems, { title = "-" })
+        end
 
         if #textTasks > 0 then
             table.insert(menuItems, { title = "Text Tasks", disabled = true })
@@ -682,10 +705,19 @@ function obj:start()
     self._menubarItem:setClickCallback(function()
         local cfg = self.config
 
-        local gitlabIssues = {}
-        getGitlabIssues(cfg, function(gitlabIssues)
-            self:_setMenubarItemIssuesList(gitlabIssues)
-            return self
+        getCurrentTogglTimer(cfg, function(success, running)
+            if success and running then
+                self._runningGitlabIssue = nil
+                self:_setRunningDescription(running.description or "Toggl timer")
+            elseif success then
+                self._runningGitlabIssue = nil
+                self:_setMenubarItemStatus(nil)
+            end
+
+            getGitlabIssues(cfg, function(gitlabIssues)
+                self:_setMenubarItemIssuesList(gitlabIssues)
+                return self
+            end)
         end)
     end)
     self:_startIdleReminderTimer()
@@ -740,6 +772,7 @@ function obj:stopCurrent()
         if success then
             self._runningGitlabIssue = nil
             self:_setMenubarItemStatus(nil)
+            self:_setMenubarItemIssuesList(self._gitlabIssues)
         end
     end)
 
